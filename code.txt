@@ -1,0 +1,66 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('cloning maven') {
+            steps {
+                git branch: 'main', url: 'https://github.com/tusharshingote09/spring-framework-petclinic.git'
+            }
+        }
+        stage('bulid') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+        
+        stage('performing static anaylsis using sonarqube') {
+            steps {
+                withSonarQubeEnv(installationName: 'sonarqube', credentialsId: 'jenkins') {
+                    sh 'mvn clean verify sonar:sonar'
+                 }
+            }
+        }
+        stage('uploading in nexus') {
+            steps {
+                nexusArtifactUploader artifacts: [[artifactId: 'spring-framework-petclinic', 
+                classifier: '', 
+                file: 'target/petclinic.war', 
+                type: 'war']], 
+                credentialsId: '1', 
+                groupId: 'org.springframework.samples', 
+                nexusUrl: '65.2.128.229:8081', 
+                nexusVersion: 'nexus3', 
+                protocol: 'http', 
+                repository: 'spring_petclinic/', 
+                version: '6.2.8'
+            }
+        }
+        stage('deploying in tomcat') {
+            steps {
+                sshagent(['tomcata']) {
+                    sh 'scp -o StrictHostKeyChecking=no target/petclinic.war ubuntu@13.233.254.24:/home/ubuntu/apache-tomcat-10.1.44/webapps'
+             }
+            }
+        }
+    }
+    post{
+            success {
+                mail bcc: '', 
+                body: 'Build is successful generated', 
+                cc: 'tusharaws56@gmail.com', 
+                from: '', 
+                replyTo: '', 
+                subject: 'Build is successful generated', 
+                to: 'tusharaws56@gmail.com'
+            }
+            failure {
+                mail bcc: '', 
+                body: 'Build is failed', 
+                cc: 'tusharaws56@gmail.com', 
+                from: '', 
+                replyTo: '', 
+                subject: 'Build is failed', 
+                to: 'tusharaws56@gmail.com'
+            }
+        }
+}
